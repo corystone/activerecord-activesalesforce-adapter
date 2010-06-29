@@ -16,54 +16,30 @@
 =end
 
 
+require 'rubygems'
+
 require 'test/unit'
 require 'set'
 require 'pp'
+
+require File.dirname(__FILE__) + '/../../lib/active_record/connection_adapters/activesalesforce_adapter'
 
 
 module Asf
   module UnitTests
 
-    module RecordedTestCase
+    module ASFTestCase
       LOGGER = Logger.new(STDOUT)
       @@config = YAML.load_file(File.dirname(__FILE__) + '/config.yml').symbolize_keys
     
-
-      def recording?
-        @recording
-      end
-      
-      
       def config
         @@config
       end
       
-      
-      def initialize(test_method_name)
-        super(test_method_name)
-        
-        @force_recording = Set.new
-      end
-      
-      
-      def force_recording(method)
-        @force_recording.add(method)
-      end
-
-
-      def unforce_recording(method)
-        @force_recording.delete(method)
-      end
-      
-      
       def setup
-        @recording = (((not File.exists?(recording_file_name)) or config[:recording]) or @force_recording.include?(method_name.to_sym))
-        
         action = { :adapter => 'activesalesforce', :url => config[:url], :username => config[:username], 
-          :password => config[:password], :recording_source => recording_file_name }
+          :password => config[:password] }
         
-        action[:recording] = true if @recording
-
         ActiveRecord::Base.logger = LOGGER
         ActiveRecord::Base.clear_active_connections!
         ActiveRecord::Base.reset_column_information_and_inheritable_attributes_for_all_subclasses
@@ -71,12 +47,6 @@ module Asf
         
         @connection = ActiveRecord::Base.connection
       end
-      
-      
-      def recording_file_name
-        File.dirname(__FILE__) + "/recorded_results/#{self.class.name.gsub('::', '')}.#{method_name}.recording"
-      end
-      
     end
     
   end

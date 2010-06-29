@@ -29,7 +29,6 @@ require File.dirname(__FILE__) + '/entity_definition'
 require File.dirname(__FILE__) + '/asf_active_record'
 require File.dirname(__FILE__) + '/id_resolver'
 require File.dirname(__FILE__) + '/sid_authentication_filter'
-require File.dirname(__FILE__) + '/recording_binding'
 require File.dirname(__FILE__) + '/result_array'
  
 
@@ -49,12 +48,12 @@ module ActiveRecord
     def self.activesalesforce_connection(config) # :nodoc:
       debug("\nUsing ActiveSalesforce connection\n")
       
-      # Default to production system using 11.0 API
+      # Default to production system using 19.0 API
       url = config[:url]
       url = "https://www.salesforce.com" unless url
 
       uri = URI.parse(url)
-      uri.path = "/services/Soap/u/11.0"
+      uri.path = "/services/Soap/u/19.0"
       url = uri.to_s      
       
       sid = config[:sid]
@@ -62,17 +61,6 @@ module ActiveRecord
       username = config[:username].to_s
       password = config[:password].to_s
       
-      # Recording/playback support      
-      recording_source = config[:recording_source]
-      recording = config[:recording]
-      
-      if recording_source
-        recording_source = File.open(recording_source, recording ? "w" : "r")
-        binding = ActiveSalesforce::RecordingBinding.new(url, nil, recording != nil, recording_source, logger)
-        binding.client_id = client_id if client_id
-        binding.login(username, password) unless sid
-      end
-
       # Check to insure that the second to last path component is a 'u' for Partner API
       raise ActiveSalesforce::ASFError.new(logger, "Invalid salesforce server url '#{url}', must be a valid Parter API URL") unless url.match(/\/u\//mi)
       
@@ -695,7 +683,7 @@ module ActiveRecord
                 referenced_klass = klass.class_eval("::#{reference_to} = Class.new(ActiveRecord::Base)")
                 
                 # Automatically inherit the connection from the referencee
-                referenced_klass.connection = klass.connection
+                #referenced_klass.connection = klass.connection
             end
             
             if referenced_klass

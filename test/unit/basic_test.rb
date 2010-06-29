@@ -15,12 +15,8 @@
   limitations under the License.
 =end
 
-require 'rubygems'
 
-#require_gem 'activesalesforce'
-require File.dirname(__FILE__) + '/../../lib/active_record/connection_adapters/activesalesforce_adapter'
-
-require File.dirname(__FILE__) + '/recorded_test_case'
+require File.dirname(__FILE__) + '/asf_test_case'
 require 'pp'
 
 
@@ -38,15 +34,9 @@ module Asf
   module UnitTests
     
     class BasicTest < Test::Unit::TestCase
-      include RecordedTestCase
+      include ASFTestCase
       
       attr_reader :contact
-      
-      def initialize(test_method_name)
-        super(test_method_name)
-        
-        #force_recording :test_create_a_contact
-      end
       
       def setup
         puts "\nStarting test '#{self.class.name.gsub('::', '')}.#{method_name}'"
