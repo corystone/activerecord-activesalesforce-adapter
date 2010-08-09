@@ -705,16 +705,19 @@ module ActiveRecord
             begin
               referenced_klass = class_from_entity_name(reference_to)
             rescue NameError => e
-                # Automatically create a least a stub for the referenced entity
-                debug("   Creating ActiveRecord stub for the referenced entity '#{reference_to}'")
-                
-                referenced_klass = klass.class_eval("Salesforce::#{reference_to} = Class.new(ActiveRecord::Base)")
-                referenced_klass.instance_variable_set("@asf_connection", klass.connection)
+              # Automatically create a least a stub for the referenced entity
+              debug("   Creating ActiveRecord stub for the referenced entity '#{reference_to}'")
+              
+              referenced_klass = begin
+                                   klass.const_set('Salesforce', Module.new) unless klass.const_defined? 'Salesforce'
+                                   klass::Salesforce.const_set(reference_to, Class.new(ActiveRecord::Base))
+                                 end
+              referenced_klass.instance_variable_set("@asf_connection", klass.connection)
 
-                # Automatically inherit the connection from the referencee
-                def referenced_klass.connection
-                  @asf_connection
-                end
+              # Automatically inherit the connection from the referencee
+              def referenced_klass.connection
+                @asf_connection
+              end
            end
             
             if referenced_klass
