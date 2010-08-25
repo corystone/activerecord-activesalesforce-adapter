@@ -700,7 +700,8 @@ module ActiveRecord
             end
             
             # Handle references to custom objects
-            reference_to = reference_to.chomp("__c").camelize if reference_to.match(/__c$/)
+            reference_name = reference_to
+            reference_name = reference_name.chomp("__c").camelize if reference_name.match(/__c$/)
             
             begin
               referenced_klass = class_from_entity_name(reference_to)
@@ -709,8 +710,8 @@ module ActiveRecord
               debug("   Creating ActiveRecord stub for the referenced entity '#{reference_to}'")
               
               referenced_klass = begin
-                                   klass.const_set('Salesforce', Module.new) unless klass.const_defined? 'Salesforce'
-                                   klass::Salesforce.const_set(reference_to, Class.new(ActiveRecord::Base))
+                                   self.class.const_set('Salesforce', Module.new) unless self.class.const_defined? 'Salesforce'
+                                   set_class_for_entity(Salesforce.const_set(reference_name, Class.new(ActiveRecord::Base)), reference_to)
                                  end
               referenced_klass.instance_variable_set("@asf_connection", klass.connection)
 
@@ -748,7 +749,10 @@ module ActiveRecord
         debug("Found matching class '#{entity_klass}' for entity '#{entity_name}'") if entity_klass
         
         # Constantize entities under the Salesforce namespace.
-        entity_klass = ("Salesforce::" + entity_name).constantize unless entity_klass
+        unless entity_klass
+          sf = self.class.const_get('Salesforce')
+          entity_klass = sf && sf.const_get(entity_name)
+        end
         
         entity_klass
       end
