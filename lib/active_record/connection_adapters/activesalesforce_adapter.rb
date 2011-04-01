@@ -669,6 +669,8 @@ module ActiveRecord
       def configure_active_record(entity_def)
         entity_name = entity_def.name
         klass = class_from_entity_name(entity_name)
+        
+        klass.default_scoping = []
 
         class << klass
           def asf_augmented?
