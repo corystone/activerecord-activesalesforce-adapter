@@ -21,7 +21,7 @@ require 'benchmark'
 require 'active_record'
 require 'active_record/connection_adapters/abstract_adapter'
 
-require File.dirname(__FILE__) + '/rforce'
+require File.dirname(__FILE__) + '/../../rforce'
 require File.dirname(__FILE__) + '/column_definition'
 require File.dirname(__FILE__) + '/relationship_definition'
 require File.dirname(__FILE__) + '/boxcar_command'
@@ -119,7 +119,7 @@ module ActiveRecord
         @entity_def_map = {}
         @keyprefix_to_entity_def_map = {}
         
-        @command_boxcar = []
+        @command_boxcar = nil
         @class_to_entity_map = {}
       end
       
@@ -143,7 +143,10 @@ module ActiveRecord
       def supports_migrations? #:nodoc:
         false
       end
-      
+
+      def table_exists?(table_name)
+        true
+      end
       
       # QUOTING ==================================================
             
@@ -172,9 +175,27 @@ module ActiveRecord
       
       
       # TRANSACTIOn SUPPORT (Boxcarring really because the salesforce.com api does not support transactions)
+
+      # Override AbstractAdapter's transaction method to implement
+      # per-connection support for nested transactions that do not commit until
+      # the outermost transaction is finished. ActiveRecord provides support
+      # for this, but does not distinguish between database connections, which
+      # prevents opening transactions to two different databases at the same
+      # time.
+      def transaction_with_nesting_support(*args, &block)
+        open = Thread.current["open_transactions_for_#{self.class.name.underscore}"] ||= 0
+        Thread.current["open_transactions_for_#{self.class.name.underscore}"] = open + 1
+
+        begin
+          transaction_without_nesting_support(&block)
+        ensure
+          Thread.current["open_transactions_for_#{self.class.name.underscore}"] -= 1
+        end
+      end
+      alias_method_chain :transaction, :nesting_support
       
       # Begins the transaction (and turns off auto-committing).
-      def begin_db_transaction()    
+      def begin_db_transaction
         log('Opening boxcar', 'begin_db_transaction()')
         @command_boxcar = []
       end
@@ -235,6 +256,9 @@ module ActiveRecord
 	        previous_command = command
           end
         end
+
+        # Discard the command boxcar
+        @command_boxcar = nil
         
         # Finish off the partial boxcar
         send_commands(commands) unless commands.empty?
@@ -245,7 +269,7 @@ module ActiveRecord
       # done if the transaction block raises an exception or returns false.
       def rollback_db_transaction() 
         log('Rolling back boxcar', 'rollback_db_transaction()')
-        @command_boxcar = []
+        @command_boxcar = nil
       end
       
       
@@ -383,7 +407,7 @@ module ActiveRecord
           
           # Track the id to be able to update it when the create() is actually executed
           id = String.new
-          @command_boxcar << ActiveSalesforce::BoxcarCommand::Insert.new(self, sobject, id)
+          queue_command ActiveSalesforce::BoxcarCommand::Insert.new(self, sobject, id)
           
           id
         }
@@ -405,11 +429,13 @@ module ActiveRecord
           fields = get_fields(columns, names, values, :updateable)
 		      null_fields = get_null_fields(columns, names, values, :updateable)          
           
-          id = sql.match(/WHERE\s+id\s*=\s*'(\w+)'/mi)[1]
+          ids = sql.match(/WHERE\s+id\s*=\s*'(\w+)'/mi)
+          return if ids.nil?
+          id = ids[1]
           
           sobject = create_sobject(entity_def.api_name, id, fields, null_fields)
           
-          @command_boxcar << ActiveSalesforce::BoxcarCommand::Update.new(self, sobject)
+          queue_command ActiveSalesforce::BoxcarCommand::Update.new(self, sobject)
         #}
       end
       
@@ -430,7 +456,7 @@ module ActiveRecord
           ids_element = []        
           ids.each { |id| ids_element << :ids << id }
           
-          @command_boxcar << ActiveSalesforce::BoxcarCommand::Delete.new(self, ids_element)
+          queue_command ActiveSalesforce::BoxcarCommand::Delete.new(self, ids_element)
         }
       end
       
@@ -672,7 +698,7 @@ module ActiveRecord
             end
             
             # Handle references to custom objects
-            reference_to = reference_to.chomp("__c").capitalize if reference_to.match(/__c$/)
+            reference_to = reference_to.chomp("__c").camelize if reference_to.match(/__c$/)
             
             begin
               referenced_klass = class_from_entity_name(reference_to)
@@ -680,17 +706,22 @@ module ActiveRecord
                 # Automatically create a least a stub for the referenced entity
                 debug("   Creating ActiveRecord stub for the referenced entity '#{reference_to}'")
                 
-                referenced_klass = klass.class_eval("::#{reference_to} = Class.new(ActiveRecord::Base)")
-                
+                referenced_klass = klass.class_eval("Salesforce::#{reference_to} = Class.new(ActiveRecord::Base)")
+                referenced_klass.instance_variable_set("@asf_connection", klass.connection)
+
                 # Automatically inherit the connection from the referencee
-                #referenced_klass.connection = klass.connection
-            end
+                def referenced_klass.connection
+                  @asf_connection
+                end
+           end
             
             if referenced_klass
               if one_to_many
-                klass.has_many referenceName.to_sym, :class_name => referenced_klass.name, :foreign_key => foreign_key, :dependent => :nullify
+                assoc_name = reference_to.underscore.pluralize.to_sym
+                klass.has_many assoc_name, :class_name => referenced_klass.name, :foreign_key => foreign_key
               else
-                klass.belongs_to referenceName.to_sym, :class_name => referenced_klass.name, :foreign_key => foreign_key
+                assoc_name = reference_to.underscore.singularize.to_sym
+                klass.belongs_to assoc_name, :class_name => referenced_klass.name, :foreign_key => foreign_key
               end
               
               debug("   Created one-to-#{one_to_many ? 'many' : 'one' } relationship '#{referenceName}' from #{klass} to #{referenced_klass} using #{foreign_key}")
@@ -711,7 +742,8 @@ module ActiveRecord
         entity_klass = @class_to_entity_map[entity_name.upcase]
         debug("Found matching class '#{entity_klass}' for entity '#{entity_name}'") if entity_klass
         
-        entity_klass = entity_name.constantize unless entity_klass
+        # Constantize entities under the Salesforce namespace.
+        entity_klass = ("Salesforce::" + entity_name).constantize unless entity_klass
         
         entity_klass
       end
@@ -757,6 +789,21 @@ module ActiveRecord
       
       def debug(msg)
         @logger.debug(msg) if @logger
+      end
+
+      protected
+
+      def queue_command(command)
+        # If @command_boxcar is not nil, then this is a transaction
+        # and commands should be queued in the boxcar
+        if @command_boxcar
+          @command_boxcar << command
+
+        # If a command is not executed within a transaction, it should
+        # be executed immediately
+        else
+          send_commands([command])
+        end
       end
       
     end
