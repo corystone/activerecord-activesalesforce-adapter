@@ -31,6 +31,20 @@ require File.dirname(__FILE__) + '/id_resolver'
 require File.dirname(__FILE__) + '/sid_authentication_filter'
 require File.dirname(__FILE__) + '/result_array'
  
+module ActiveSalesforce  
+  
+  class ASFError < RuntimeError
+    attr :fault
+    
+    def initialize(logger, message, fault = nil)
+      super message
+      
+      @fault = fault
+      
+      logger.debug("\nASFError:\n   message='#{message}'\n   fault='#{fault}'\n\n")
+    end
+  end
+end
 
 module ActiveRecord    
   class Base   
@@ -182,17 +196,17 @@ module ActiveRecord
       # for this, but does not distinguish between database connections, which
       # prevents opening transactions to two different databases at the same
       # time.
-      def transaction_with_nesting_support(*args, &block)
-        open = Thread.current["open_transactions_for_#{self.class.name.underscore}"] ||= 0
-        Thread.current["open_transactions_for_#{self.class.name.underscore}"] = open + 1
-
-        begin
-          transaction_without_nesting_support(&block)
-        ensure
-          Thread.current["open_transactions_for_#{self.class.name.underscore}"] -= 1
-        end
-      end
-      alias_method_chain :transaction, :nesting_support
+      # def transaction_with_nesting_support(*args, &block)
+      #   Thread.current["open_transactions_for_#{self.class.name.underscore}"] ||= 0
+      #   Thread.current["open_transactions_for_#{self.class.name.underscore}"] += 1
+      #   puts Thread.current["open_transactions_for_#{self.class.name.underscore}"]
+      #   begin
+      #     transaction_without_nesting_support(&block)
+      #   ensure
+      #     Thread.current["open_transactions_for_#{self.class.name.underscore}"] -= 1
+      #   end
+      # end
+      # alias_method_chain :transaction, :nesting_support
       
       # Begins the transaction (and turns off auto-committing).
       def begin_db_transaction
@@ -402,7 +416,7 @@ module ActiveRecord
           values.map! { |v| v.first == "'" ? v.slice(1, v.length - 2) : v == "NULL" ? nil : v }
           
           fields = get_fields(columns, names, values, :createable)
-          
+
           sobject = create_sobject(entity_def.api_name, nil, fields)
           
           # Track the id to be able to update it when the create() is actually executed
@@ -411,11 +425,11 @@ module ActiveRecord
           
           id
         }
-      end      
+      end
       
       
       def update(sql, name = nil) #:nodoc:
-        #log(sql, name) {
+        log(sql, name) {
           # Convert sql to sobject
           table_name, columns, entity_def = lookup(sql.match(/UPDATE\s+(\w+)\s+/mi)[1])
           columns = entity_def.column_name_to_column
@@ -436,7 +450,7 @@ module ActiveRecord
           sobject = create_sobject(entity_def.api_name, id, fields, null_fields)
           
           queue_command ActiveSalesforce::BoxcarCommand::Update.new(self, sobject)
-        #}
+        }
       end
       
       
@@ -611,6 +625,7 @@ module ActiveRecord
         cached_entity_def = @entity_def_map[entity_name]
         
         if cached_entity_def
+          debug( "   Using cached entity_def for #{entity_name}")
           # Check for the loss of asf AR setup 
           entity_klass = class_from_entity_name(entity_name)
           
@@ -788,8 +803,7 @@ module ActiveRecord
         
         # See if a table name to AR class mapping was registered
         klass = @class_to_entity_map[table_name.upcase]
-        
-        entity_name = klass ? raw_table_name : table_name.camelize
+        entity_name = klass ? table_name : table_name.camelize
         entity_def = get_entity_def(entity_name)
         
         [table_name, entity_def.columns, entity_def]
