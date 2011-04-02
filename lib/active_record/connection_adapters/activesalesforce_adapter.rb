@@ -29,9 +29,9 @@ require File.dirname(__FILE__) + '/asf_active_record'
 require File.dirname(__FILE__) + '/id_resolver'
 require File.dirname(__FILE__) + '/sid_authentication_filter'
 require File.dirname(__FILE__) + '/result_array'
- 
-module ActiveSalesforce  
-  
+
+
+module ActiveSalesforce
   class ASFError < RuntimeError
     attr :fault
     
@@ -45,23 +45,28 @@ module ActiveSalesforce
   end
 end
 
-module ActiveRecord    
-  class Base   
+
+module ActiveRecord
+  class Base
     @@cache = {}
-    
+
+
     def self.debug(msg)
       logger.debug(msg) if logger
     end
-    
+
+
     def self.flush_connections()
       @@cache = {}
     end
-    
+
+
     # AcitveRecord expects this to be here (we don't use scopes with AS anyway)
     def self.default_scoping
       []
     end
-    
+
+
     # Establishes a connection to the database that's used by all Active Record objects.
     def self.activesalesforce_connection(config) # :nodoc:
       debug("\nUsing ActiveSalesforce connection\n")
@@ -116,8 +121,8 @@ module ActiveRecord
 
     end
   end
-  
-  
+
+
   module ConnectionAdapters
     
     class SalesforceAdapter < AbstractAdapter
@@ -127,7 +132,8 @@ module ActiveRecord
       
       attr_accessor :batch_size
       attr_reader :entity_def_map, :keyprefix_to_entity_def_map, :config, :class_to_entity_map
-      
+
+
       def initialize(connection, logger, config)
         super(connection, logger)
         
@@ -140,32 +146,34 @@ module ActiveRecord
         @command_boxcar = nil
         @class_to_entity_map = {}
       end
-      
-      
+
+
       def set_class_for_entity(klass, entity_name)
         debug("Setting @class_to_entity_map['#{entity_name.upcase}'] = #{klass} for connection #{self}")
         @class_to_entity_map[entity_name.upcase] = klass
       end
-      
-      
+
+
       def binding
         @connection
       end
-      
-      
+
+
       def adapter_name #:nodoc:
         'ActiveSalesforce'
       end
-      
-      
+
+
       def supports_migrations? #:nodoc:
         false
       end
 
+
       def table_exists?(table_name)
         true
       end
-      
+
+
       # QUOTING ==================================================
             
       def quote(value, column = nil)
@@ -179,21 +187,22 @@ module ActiveRecord
         
         quoted_value
       end
-      
+
+
       # CONNECTION MANAGEMENT ====================================
       
       def active?
         true
       end
-      
-      
+
+
       def reconnect!
         connect
       end
-      
-      
-      # TRANSACTION SUPPORT (Boxcarring really because the salesforce.com api does not support transactions)
 
+
+      # TRANSACTION SUPPORT (Boxcarring really because the salesforce.com api does not support transactions)
+      
       # Override AbstractAdapter's transaction method to implement
       # per-connection support for nested transactions that do not commit until
       # the outermost transaction is finished. ActiveRecord provides support
@@ -210,15 +219,15 @@ module ActiveRecord
           Thread.current["open_transactions_for_#{self.class.name.underscore}"] -= 1
         end
       end
-      
-      
+
+
       # Begins the transaction (and turns off auto-committing).
       def begin_db_transaction
         log('Opening boxcar', 'begin_db_transaction()')
         @command_boxcar = []
       end
-      
-      
+
+
       def send_commands(commands)
         # Send the boxcar'ed command set
         verb = commands[0].verb
@@ -254,8 +263,8 @@ module ActiveRecord
         
         result
       end
-      
-       
+
+
       # Commits the transaction (and turns on auto-committing).
       def commit_db_transaction()   
         log("Committing boxcar with #{@command_boxcar.length} commands", 'commit_db_transaction()')
@@ -271,10 +280,10 @@ module ActiveRecord
             previous_command = nil
           else
             commands << command
-	        previous_command = command
+          previous_command = command
           end
         end
-
+        
         # Discard the command boxcar
         @command_boxcar = nil
         
@@ -282,15 +291,16 @@ module ActiveRecord
         send_commands(commands) unless commands.empty?
         
       end
-      
+
+
       # Rolls back the transaction (and turns on auto-committing). Must be
       # done if the transaction block raises an exception or returns false.
       def rollback_db_transaction() 
         log('Rolling back boxcar', 'rollback_db_transaction()')
         @command_boxcar = nil
       end
-      
-      
+
+
       # DATABASE STATEMENTS ======================================
       
       def select_all(sql, name = nil) #:nodoc:
@@ -298,7 +308,7 @@ module ActiveRecord
           table_name, columns, entity_def = lookup(raw_table_name)
           
           column_names = columns.map { |column| column.api_name }
-
+          
           # Check for SELECT COUNT(*) FROM query
         
         # Rails 1.1
@@ -366,11 +376,12 @@ module ActiveRecord
         
         result
       end
-      
+
+
       def add_rows(entity_def, query_result, result, limit)
         records = query_result[:records]
         records = [ records ] unless records.is_a?(Array)
-
+        
         records.each do |record|
           row = {}
           
@@ -388,14 +399,15 @@ module ActiveRecord
                 row[attribute_name] = value
               end
             end
-          end  
+          end
           
           result << row
           
           break if result.size >= limit and limit != 0
         end
       end
-      
+
+
       def select_one(sql, name = nil) #:nodoc:
         self.batch_size = 1
         
@@ -403,8 +415,8 @@ module ActiveRecord
         
         result.nil? ? nil : result.first
       end
-      
-      
+
+
       def insert(sql, name = nil, pk = nil, id_value = nil, sequence_name = nil)
         log(sql, name) {
           # Convert sql to sobject
@@ -430,8 +442,8 @@ module ActiveRecord
           id
         }
       end
-      
-      
+
+
       def update(sql, name = nil) #:nodoc:
         log(sql, name) {
           # Convert sql to sobject
@@ -445,7 +457,7 @@ module ActiveRecord
           values.map! { |v| v.first == "'" ? v.slice(1, v.length - 2) : v == "NULL" ? nil : v }
           
           fields = get_fields(columns, names, values, :updateable)
-		      null_fields = get_null_fields(columns, names, values, :updateable)          
+          null_fields = get_null_fields(columns, names, values, :updateable)          
           
           ids = sql.match(/WHERE\s+id\s*=\s*'(\w+)'/mi)
           return if ids.nil?
@@ -456,8 +468,8 @@ module ActiveRecord
           queue_command ActiveSalesforce::BoxcarCommand::Update.new(self, sobject)
         }
       end
-      
-      
+
+
       def delete(sql, name = nil) 
         log(sql, name) {
           # Extract the id
@@ -477,8 +489,8 @@ module ActiveRecord
           queue_command ActiveSalesforce::BoxcarCommand::Delete.new(self, ids_element)
         }
       end
-      
-      
+
+
       def get_updated(object_type, start_date, end_date, name = nil)
         msg = "get_updated(#{object_type}, #{start_date}, #{end_date})"
         log(msg, name) {
@@ -492,8 +504,8 @@ module ActiveRecord
           result[:ids]
         }
       end
-      
-      
+
+
       def get_deleted(object_type, start_date, end_date, name = nil)
         msg = "get_deleted(#{object_type}, #{start_date}, #{end_date})"
         log(msg, name) {
@@ -510,22 +522,22 @@ module ActiveRecord
           end
           
           ids
-        }      
+        }
       end
 
-      
+
       def get_user_info(name = nil)
         msg = "get_user_info()"
         log(msg, name) {
           get_result(@connection.getUserInfo([]), :getUserInfo)
-        }      
+        }
       end
-      
-      
+
+
       def retrieve_field_values(object_type, fields, ids, name = nil) 
         msg = "retrieve(#{object_type}, [#{ids.to_a.join(', ')}])"
         log(msg, name) {
-          retrieve_element = []      
+          retrieve_element = []
           retrieve_element << :fieldList << fields.to_a.join(", ")
           retrieve_element << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << object_type
           ids.to_a.each { |id| retrieve_element << :ids << id }
@@ -547,8 +559,8 @@ module ActiveRecord
           field_values
         }
       end
-      
-      
+
+
       def get_fields(columns, names, values, access_check) 
         fields = {}
         names.each_with_index do | name, n | 
@@ -576,22 +588,24 @@ module ActiveRecord
           end
         end
         
-        fields      
+        fields
       end
-      
-	  def get_null_fields(columns, names, values, access_check)
-     	fields = {}
- 	  	names.each_with_index do | name, n |
- 			value = values[n]
 
- 			if !value
- 				column = columns[name]
- 				fields[column.api_name] = nil if column.send(access_check) && column.api_name.casecmp("ownerid") != 0
- 			end
- 		end
 
-		fields
-	  end
+      def get_null_fields(columns, names, values, access_check)
+        fields = {}
+        
+        names.each_with_index do | name, n |
+          value = values[n]
+          
+          if !value
+            column = columns[name]
+            fields[column.api_name] = nil if column.send(access_check) && column.api_name.casecmp("ownerid") != 0
+          end
+        end
+        
+        fields
+      end
       
       def extract_sql_modifier(soql, modifier)
           value = soql.match(/\s+#{modifier}\s+(\d+)/mi)
@@ -602,8 +616,8 @@ module ActiveRecord
           
           value
       end
-      
-      
+
+
       def get_result(response, method)
         responseName = (method.to_s + "Response").to_sym
         finalResponse = response[responseName]
@@ -611,9 +625,9 @@ module ActiveRecord
         raise ActiveSalesforce::ASFError.new(@logger, response[:Fault][:faultstring], response.fault) unless finalResponse
         
         result = finalResponse[:result]
-      end       
-      
-      
+      end
+
+
       def check_result(result)
         result = [ result ] unless result.is_a?(Array)
         
@@ -623,8 +637,8 @@ module ActiveRecord
         
         result
       end
-      
-      
+
+
       def get_entity_def(entity_name)
         cached_entity_def = @entity_def_map[entity_name]
         
@@ -683,8 +697,8 @@ module ActiveRecord
         
         entity_def
       end
-      
-      
+
+
       def configure_active_record(entity_def)
         entity_name = entity_def.name
         klass = class_from_entity_name(entity_name)
@@ -751,16 +765,15 @@ module ActiveRecord
           debug("   Created one-to-#{one_to_many ? 'many' : 'one' } relationship '#{name}' from #{klass} to #{referenced_klass} using #{foreign_key}")
           
         end # relationships
-        
       end
-      
-      
+
+
       def columns(table_name, name = nil)
         table_name, columns, entity_def = lookup(table_name)
         entity_def.columns
       end
-      
-      
+
+
       def class_from_entity_name(entity_name)
         entity_klass = @class_to_entity_map[entity_name.upcase]
         debug("Found matching class '#{entity_klass}' for entity '#{entity_name}'") if entity_klass
@@ -770,11 +783,11 @@ module ActiveRecord
           sf = self.class.const_get('Salesforce')
           entity_klass = sf && sf.const_get(entity_name)
         end
-
+        
         entity_klass
       end
-      
-      
+
+
       def create_sobject(entity_name, id, fields, null_fields = [])
         sobj = []
         
@@ -788,18 +801,18 @@ module ActiveRecord
         
         # add null fields
         null_fields.each do | name, value |
-			sobj << 'fieldsToNull { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << name
-		end
+          sobj << 'fieldsToNull { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << name
+        end
         
         [ :sObjects, sobj ]
       end
-      
-      
+
+
       def column_names(table_name)
         columns(table_name).map { |column| column.name }
       end
 
-      
+
       def lookup(raw_table_name)
         table_name = raw_table_name.downcase.singularize
         
@@ -810,8 +823,8 @@ module ActiveRecord
         
         [table_name, entity_def.columns, entity_def]
       end
-      
-      
+
+
       def debug(msg)
         @logger.debug(msg) if @logger
       end
