@@ -703,20 +703,18 @@ module ActiveRecord
         entity_def.relationships.each do |relationship|
           referenceName = relationship.name
           unless self.respond_to? referenceName.to_sym or relationship.reference_to == "Profile" 
-            reference_to = relationship.reference_to
             one_to_many = relationship.one_to_many
             foreign_key = relationship.foreign_key
             
             # DCHASMAN TODO Figure out how to handle polymorphic refs (e.g. Note.parent can refer to 
             # Account, Contact, Opportunity, Contract, Asset, Product2, <CustomObject1> ... <CustomObject(n)>
-            if reference_to.is_a? Array
+            if relationship.reference_to.is_a? Array
               debug("   Skipping unsupported polymophic one-to-#{one_to_many ? 'many' : 'one' } relationship '#{referenceName}' from #{klass} to [#{relationship.reference_to.join(', ')}] using #{foreign_key}")
               next 
             end
             
             # Handle references to custom objects
-            reference_name = reference_to
-            reference_name = reference_name.chomp("__c").camelize if reference_name.match(/__c$/)
+            reference_to = relationship.reference_to.match(/__c$/) ? relationship.reference_to.chomp("__c").camelize : relationship.reference_to
             
             begin
               referenced_klass = class_from_entity_name(reference_to)
@@ -724,10 +722,13 @@ module ActiveRecord
               # Automatically create a least a stub for the referenced entity
               debug("   Creating ActiveRecord stub for the referenced entity '#{reference_to}'")
               
-              referenced_klass = begin
-                                   self.class.const_set('Salesforce', Module.new) unless self.class.const_defined? 'Salesforce'
-                                   set_class_for_entity(Salesforce.const_set(reference_name, Class.new(ActiveRecord::Base)), reference_to)
-                                 end
+              # referenced_klass = begin
+              #                      self.class.const_set('Salesforce', Module.new) unless self.class.const_defined? 'Salesforce'
+              #                      set_class_for_entity(Salesforce.const_set(reference_name, Class.new(ActiveRecord::Base)), reference_to)
+              #                    end
+              
+              referenced_klass = klass.class_eval("Salesforce::#{reference_to} = Class.new(ActiveRecord::Base)")
+
               referenced_klass.instance_variable_set("@asf_connection", klass.connection)
 
               # Automatically inherit the connection from the referencee
@@ -799,7 +800,7 @@ module ActiveRecord
 
       
       def lookup(raw_table_name)
-        table_name = raw_table_name.singularize
+        table_name = raw_table_name.downcase.singularize
         
         # See if a table name to AR class mapping was registered
         klass = @class_to_entity_map[table_name.upcase]
