@@ -40,14 +40,13 @@ spec = Gem::Specification.new do |s|
   # If you want to depend on other gems, add them here, along with any
   # relevant versions
   s.add_dependency("rails",   "~> 2.3.8")
-  s.add_dependency("builder", ">= 1.2.4")
-  s.add_dependency("hpricot", ">= 0.8.2")
+  s.add_dependency("rforce",  "~> 0.4")
 
   # If your tests use any gems, include them here
   # s.add_development_dependency("mocha") # for example
   
-  s.post_install_message = %q{This version is a merge of the mainline activesalesforce with althor880 fork.
-  It is compatible with Rails >= 2.3.3. NOT Rails 3 compat. Please report any bug in the group
+  s.post_install_message = %q{This version is a merge of the mainline activesalesforce with althor880 fork with some bits and pieces from other forks.
+  It is compatible with Rails ~> 2.3.8. NOT Rails 3 compat. Please report any bug in the group
   http://groups.google.com/group/activesalesforce
   }
 end
