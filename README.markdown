@@ -20,11 +20,13 @@ This repo is a fork of [dchasman activesalesforce] [dchasman] with changes/commi
 
 #### To use amphora-activerecord-activesalesforce-adapter you can either:
 
-1. Clone the repo and build the gem yourself with:
+* Clone the repo and build the gem yourself with:
 
         rake gem
 
-2. Add a reference to your project using bundler. In your Gemfile:
+#### Or:
+
+* Add a reference to your project using bundler. In your Gemfile:
 
         gem 'activerecord-activesalesforce-adapter', :git => 'git://github.com/amphora/activerecord-activesalesforce-adapter.git'
 
