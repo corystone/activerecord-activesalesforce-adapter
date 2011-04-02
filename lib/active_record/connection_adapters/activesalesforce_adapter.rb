@@ -57,7 +57,7 @@ module ActiveRecord
     def self.flush_connections()
       @@cache = {}
     end
-
+    
     # Establishes a connection to the database that's used by all Active Record objects.
     def self.activesalesforce_connection(config) # :nodoc:
       debug("\nUsing ActiveSalesforce connection\n")
@@ -188,7 +188,7 @@ module ActiveRecord
       end
       
       
-      # TRANSACTIOn SUPPORT (Boxcarring really because the salesforce.com api does not support transactions)
+      # TRANSACTION SUPPORT (Boxcarring really because the salesforce.com api does not support transactions)
 
       # Override AbstractAdapter's transaction method to implement
       # per-connection support for nested transactions that do not commit until
@@ -196,17 +196,17 @@ module ActiveRecord
       # for this, but does not distinguish between database connections, which
       # prevents opening transactions to two different databases at the same
       # time.
-      # def transaction_with_nesting_support(*args, &block)
-      #   Thread.current["open_transactions_for_#{self.class.name.underscore}"] ||= 0
-      #   Thread.current["open_transactions_for_#{self.class.name.underscore}"] += 1
-      #   puts Thread.current["open_transactions_for_#{self.class.name.underscore}"]
-      #   begin
-      #     transaction_without_nesting_support(&block)
-      #   ensure
-      #     Thread.current["open_transactions_for_#{self.class.name.underscore}"] -= 1
-      #   end
-      # end
-      # alias_method_chain :transaction, :nesting_support
+      def transaction(options, &block)
+        Thread.current["open_transactions_for_#{self.class.name.underscore}"] ||= 0
+        Thread.current["open_transactions_for_#{self.class.name.underscore}"] += 1
+        
+        begin
+          super
+        ensure
+          Thread.current["open_transactions_for_#{self.class.name.underscore}"] -= 1
+        end
+      end
+      
       
       # Begins the transaction (and turns off auto-committing).
       def begin_db_transaction
