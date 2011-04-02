@@ -23,10 +23,13 @@ module Salesforce
   class Contact < ActiveRecord::Base
   end
 
-  class Department < ActiveRecord::Base
-  end
-
   class Address < ActiveRecord::Base
+  end
+  
+  class Note < ActiveRecord::Base
+  end
+  
+  class User < ActiveRecord::Base
   end
 end
 
@@ -72,29 +75,28 @@ module Asf
         binding.trigger_user_email = false    
       end
 
-
       def test_create_a_contact
-        contact.id
+        assert contact.id
       end
-
+      
       def test_count_contacts
         assert Salesforce::Contact.count > 0
       end
       
       def test_save_a_contact
-        contact.id
+        assert contact.id
       end
-
+      
       def test_find_a_contact
         c = Salesforce::Contact.find(contact.id)
         assert_equal contact.id, c.id
       end
-
+      
       def test_find_a_contact_by_id
         c = Salesforce::Contact.find_by_id(contact.id)
         assert_equal contact.id, c.id
       end
-
+      
       def test_find_a_contact_by_first_name
         c = Salesforce::Contact.find_by_first_name('DutchTestFirstName')
         assert_equal contact.id, c.id
@@ -111,71 +113,59 @@ module Asf
       
       def test_use_update_mru
         Salesforce::Contact.connection.binding.update_mru = true
-        contact.save
+        assert contact.save
       end
-
+      
       def test_use_default_rule
         Salesforce::Contact.connection.binding.use_default_rule = true
-        contact.save
+        assert contact.save
       end
-
+      
       def test_assignment_rule_id
         Salesforce::Contact.connection.binding.assignment_rule_id = "1234567890"
-        contact.save
+        assert contact.save
       end
       
       def test_client_id
         Salesforce::Contact.connection.binding.client_id = "testClient"
-        contact.save
+        assert contact.save
       end
-      
- 
+       
       def test_add_notes_to_contact
-        n1 = Salesforce::Note.new(:title => "My Title", :body => "My Body")
-        n2 = Salesforce::Note.new(:title => "My Title 2", :body => "My Body 2")
+        n1 = Salesforce::Note.new(:title => "My Title", :body => "My Body", :parent_id => contact.id)
+        n2 = Salesforce::Note.new(:title => "My Title 2", :body => "My Body 2", :parent_id => contact.id)
         
-        contact.notes << n1
-        contact.notes << n2
-        
+        # Can't use << with notes as there is a polymorphic assoc
+        # contact.notes << n1
+        # contact.notes << n2
         n1.save
         n2.save
+        
+        assert_equal(2, contact.notes.length)
       end
-      
-      def test_master_detail
-        department = Salesforce::Department.new(:department_description__c => 'DutchTestDepartment description')
-        department.save
-        department.reload
-        
-        job = Job.new(:name => "DutchJob")
-        
-        department.jobs__c << job
-        
-        department.destroy
-      end
-
       
       def test_batch_insert
         c1 = Salesforce::Contact.new(:first_name => 'FN1', :last_name => 'LN1')
         c2 = Salesforce::Contact.new(:first_name => 'FN2', :last_name => 'LN2')
         c3 = Salesforce::Contact.new(:first_name => 'FN3', :last_name => 'LN3')
-
-        Salesforce::Contact.transaction(c1, c2) do
+      
+        Salesforce::Contact.transaction do
           c1.save
           c2.save
         end
         
         c3.save
-
+      
         c1.first_name << '_2'        
         c2.first_name << '_2'        
         c3.first_name << '_2'        
-
-        Salesforce::Contact.transaction(c1, c2) do
+      
+        Salesforce::Contact.transaction do
           c1.save
           c2.save
         end
         
-        Salesforce::Contact.transaction(c1, c2) do
+        Salesforce::Contact.transaction do
           c3.save
         
           c3.destroy
@@ -184,10 +174,7 @@ module Asf
         end
       end
       
-      def test_find_addresses
-        adresses = Salesforce::Address.find(:all)
-      end
-                  
+
     end
 
   end

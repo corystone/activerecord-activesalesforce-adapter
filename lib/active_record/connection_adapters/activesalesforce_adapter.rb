@@ -58,6 +58,11 @@ module ActiveRecord
       @@cache = {}
     end
     
+    # AcitveRecord expects this to be here (we don't use scopes with AS anyway)
+    def self.default_scoping
+      []
+    end
+    
     # Establishes a connection to the database that's used by all Active Record objects.
     def self.activesalesforce_connection(config) # :nodoc:
       debug("\nUsing ActiveSalesforce connection\n")
@@ -684,9 +689,14 @@ module ActiveRecord
       def configure_active_record(entity_def)
         entity_name = entity_def.name
         klass = class_from_entity_name(entity_name)
-        
-        klass.default_scoping = []
 
+        klass.set_inheritance_column nil unless entity_def.custom?
+        klass.set_primary_key "id" 
+        
+        # AcitveRecord expects this to be here
+        klass.default_scoping = []
+        
+        # Mark the class as having been 'augmented' (ha!)
         class << klass
           def asf_augmented?
             true
@@ -696,60 +706,52 @@ module ActiveRecord
         # Add support for SID-based authentication
         ActiveSalesforce::SessionIDAuthenticationFilter.register(klass)
         
-        klass.set_inheritance_column nil unless entity_def.custom?
-        klass.set_primary_key "id" 
-        
         # Create relationships for any reference field
         entity_def.relationships.each do |relationship|
-          referenceName = relationship.name
-          unless self.respond_to? referenceName.to_sym or relationship.reference_to == "Profile" 
-            one_to_many = relationship.one_to_many
-            foreign_key = relationship.foreign_key
-            
-            # DCHASMAN TODO Figure out how to handle polymorphic refs (e.g. Note.parent can refer to 
-            # Account, Contact, Opportunity, Contract, Asset, Product2, <CustomObject1> ... <CustomObject(n)>
-            if relationship.reference_to.is_a? Array
-              debug("   Skipping unsupported polymophic one-to-#{one_to_many ? 'many' : 'one' } relationship '#{referenceName}' from #{klass} to [#{relationship.reference_to.join(', ')}] using #{foreign_key}")
-              next 
-            end
-            
-            # Handle references to custom objects
-            reference_to = relationship.reference_to.match(/__c$/) ? relationship.reference_to.chomp("__c").camelize : relationship.reference_to
-            
-            begin
-              referenced_klass = class_from_entity_name(reference_to)
-            rescue NameError => e
-              # Automatically create a least a stub for the referenced entity
-              debug("   Creating ActiveRecord stub for the referenced entity '#{reference_to}'")
-              
-              # referenced_klass = begin
-              #                      self.class.const_set('Salesforce', Module.new) unless self.class.const_defined? 'Salesforce'
-              #                      set_class_for_entity(Salesforce.const_set(reference_name, Class.new(ActiveRecord::Base)), reference_to)
-              #                    end
-              
-              referenced_klass = klass.class_eval("Salesforce::#{reference_to} = Class.new(ActiveRecord::Base)")
+          one_to_many = relationship.one_to_many
+          foreign_key = relationship.foreign_key
+          name = (one_to_many ? relationship.name.pluralize : relationship.name.singularize).downcase.underscore.to_sym
+          
+          ## Skip if ...
+          # DCHASMAN TODO Figure out how to handle polymorphic refs (e.g. Note.parent can refer to 
+          # Account, Contact, Opportunity, Contract, Asset, Product2, <CustomObject1> ... <CustomObject(n)>
+          if relationship.reference_to.is_a? Array
+            debug("   Skipping unsupported polymophic one-to-#{one_to_many ? 'many' : 'one' } relationship '#{name}' from #{klass} to [#{relationship.reference_to.join(', ')}] using #{foreign_key}")
+            next
 
-              referenced_klass.instance_variable_set("@asf_connection", klass.connection)
-
-              # Automatically inherit the connection from the referencee
-              def referenced_klass.connection
-                @asf_connection
-              end
-           end
-            
-            if referenced_klass
-              if one_to_many
-                assoc_name = reference_to.underscore.pluralize.to_sym
-                klass.has_many assoc_name, :class_name => referenced_klass.name, :foreign_key => foreign_key
-              else
-                assoc_name = reference_to.underscore.singularize.to_sym
-                klass.belongs_to assoc_name, :class_name => referenced_klass.name, :foreign_key => foreign_key
-              end
-              
-              debug("   Created one-to-#{one_to_many ? 'many' : 'one' } relationship '#{referenceName}' from #{klass} to #{referenced_klass} using #{foreign_key}")
-            end            
+          # Skip if the assoc already exists or if this is a reference to Profile
+          elsif self.respond_to?(name) || relationship.reference_to == "Profile"
+            next
           end
-        end
+          
+          # Handle references to custom objects
+          reference_to = relationship.reference_to.match(/__c$/) ? relationship.reference_to.chomp("__c").camelize : relationship.reference_to
+
+          referenced_klass = begin
+            class_from_entity_name(reference_to)
+          rescue NameError => e
+            # Automatically create at least a stub for the referenced entity
+            debug("   Creating ActiveRecord stub for the referenced entity '#{reference_to}'")
+            self.class.const_set('Salesforce', Module.new) unless self.class.const_defined? 'Salesforce'
+            # Use entity map to prevent duplicate definitions
+            set_class_for_entity(Salesforce.const_set(reference_to, Class.new(ActiveRecord::Base)), reference_to)
+          end
+          
+          referenced_klass.instance_variable_set("@asf_connection", klass.connection)
+
+          # Automatically inherit the connection from the referencee
+          def referenced_klass.connection
+            @asf_connection
+          end
+          
+          if one_to_many
+            klass.has_many name, :class_name => referenced_klass.name, :foreign_key => foreign_key
+          else
+            klass.belongs_to name, :class_name => referenced_klass.name, :foreign_key => foreign_key
+          end
+          debug("   Created one-to-#{one_to_many ? 'many' : 'one' } relationship '#{name}' from #{klass} to #{referenced_klass} using #{foreign_key}")
+          
+        end # relationships
         
       end
       
@@ -769,7 +771,7 @@ module ActiveRecord
           sf = self.class.const_get('Salesforce')
           entity_klass = sf && sf.const_get(entity_name)
         end
-        
+
         entity_klass
       end
       
