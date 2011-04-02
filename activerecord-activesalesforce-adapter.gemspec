@@ -6,10 +6,10 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Doug Chasman", "Luigi Montanez", "Senthil Nayagam", "Justin Ball", "Jesse Hallett", "Andrew Freeberg", "Don Morrison"]
-  s.date = %q{2011-03-31}
+  s.date = %q{2011-04-01}
   s.email = %q{elskwid@gmail.com}
   s.extra_rdoc_files = ["README"]
-  s.files = ["LICENSE", "Rakefile", "README.md", "test/unit", "test/unit/asf_test_case.rb", "test/unit/basic_test.rb", "test/unit/config.yml", "lib/active_record", "lib/active_record/connection_adapters", "lib/active_record/connection_adapters/activesalesforce.rb", "lib/active_record/connection_adapters/activesalesforce_adapter.rb", "lib/active_record/connection_adapters/asf_active_record.rb", "lib/active_record/connection_adapters/boxcar_command.rb", "lib/active_record/connection_adapters/column_definition.rb", "lib/active_record/connection_adapters/entity_definition.rb", "lib/active_record/connection_adapters/id_resolver.rb", "lib/active_record/connection_adapters/relationship_definition.rb", "lib/active_record/connection_adapters/result_array.rb", "lib/active_record/connection_adapters/sid_authentication_filter.rb", "lib/activerecord-activesalesforce-adapter.rb", "lib/rforce", "lib/rforce/binding.rb", "lib/rforce/method_keys.rb", "lib/rforce/soap_pullable.rb", "lib/rforce/soap_response.rb", "lib/rforce/soap_response_expat.rb", "lib/rforce/soap_response_hpricot.rb", "lib/rforce/soap_response_rexml.rb", "lib/rforce/version.rb", "lib/rforce.rb", "README"]
+  s.files = ["LICENSE", "Rakefile", "README.md", "test/unit", "test/unit/asf_test_case.rb", "test/unit/basic_test.rb", "test/unit/config.yml", "test/unit/config.yml.example", "lib/active_record", "lib/active_record/connection_adapters", "lib/active_record/connection_adapters/activesalesforce.rb", "lib/active_record/connection_adapters/activesalesforce_adapter.rb", "lib/active_record/connection_adapters/asf_active_record.rb", "lib/active_record/connection_adapters/boxcar_command.rb", "lib/active_record/connection_adapters/column_definition.rb", "lib/active_record/connection_adapters/entity_definition.rb", "lib/active_record/connection_adapters/id_resolver.rb", "lib/active_record/connection_adapters/relationship_definition.rb", "lib/active_record/connection_adapters/result_array.rb", "lib/active_record/connection_adapters/sid_authentication_filter.rb", "lib/activerecord-activesalesforce-adapter.rb", "lib/rforce", "lib/rforce/binding.rb", "lib/rforce/method_keys.rb", "lib/rforce/soap_pullable.rb", "lib/rforce/soap_response.rb", "lib/rforce/soap_response_expat.rb", "lib/rforce/soap_response_hpricot.rb", "lib/rforce/soap_response_rexml.rb", "lib/rforce/version.rb", "lib/rforce.rb", "README"]
   s.homepage = %q{http://github.com/amphora/activerecord-activesalesforce-adapter}
   s.post_install_message = %q{This version is a merge of the mainline activesalesforce with althor880 fork.
   It is compatible with Rails >= 2.3.3. NOT Rails 3 compat. Please report any bug in the group
@@ -25,16 +25,16 @@ Gem::Specification.new do |s|
     s.specification_version = 3
 
     if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
-      s.add_runtime_dependency(%q<rails>, ["~> 2.3.3"])
+      s.add_runtime_dependency(%q<rails>, ["~> 2.3.8"])
       s.add_runtime_dependency(%q<builder>, [">= 1.2.4"])
       s.add_runtime_dependency(%q<hpricot>, [">= 0.8.2"])
     else
-      s.add_dependency(%q<rails>, ["~> 2.3.3"])
+      s.add_dependency(%q<rails>, ["~> 2.3.8"])
       s.add_dependency(%q<builder>, [">= 1.2.4"])
       s.add_dependency(%q<hpricot>, [">= 0.8.2"])
     end
   else
-    s.add_dependency(%q<rails>, ["~> 2.3.3"])
+    s.add_dependency(%q<rails>, ["~> 2.3.8"])
     s.add_dependency(%q<builder>, [">= 1.2.4"])
     s.add_dependency(%q<hpricot>, [">= 0.8.2"])
   end

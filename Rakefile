@@ -39,7 +39,7 @@ spec = Gem::Specification.new do |s|
 
   # If you want to depend on other gems, add them here, along with any
   # relevant versions
-  s.add_dependency("rails",   "~> 2.3.3")
+  s.add_dependency("rails",   "~> 2.3.8")
   s.add_dependency("builder", ">= 1.2.4")
   s.add_dependency("hpricot", ">= 0.8.2")
 
