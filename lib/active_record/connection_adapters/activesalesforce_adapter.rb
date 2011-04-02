@@ -17,11 +17,10 @@ limitations under the License.
 
 require 'thread'  
 require 'benchmark'
-
+require 'rforce'
 require 'active_record'
 require 'active_record/connection_adapters/abstract_adapter'
 
-require File.dirname(__FILE__) + '/../../rforce'
 require File.dirname(__FILE__) + '/column_definition'
 require File.dirname(__FILE__) + '/relationship_definition'
 require File.dirname(__FILE__) + '/boxcar_command'
@@ -67,12 +66,12 @@ module ActiveRecord
     def self.activesalesforce_connection(config) # :nodoc:
       debug("\nUsing ActiveSalesforce connection\n")
       
-      # Default to production system using 19.0 API
+      # Default to production system using 20.0 API
       url = config[:url]
       url = "https://www.salesforce.com" unless url
 
       uri = URI.parse(url)
-      uri.path = "/services/Soap/u/19.0"
+      uri.path = "/services/Soap/u/20.0"
       url = uri.to_s      
       
       sid = config[:sid]
@@ -100,7 +99,7 @@ module ActiveRecord
         binding = @@cache["#{url}.#{username}.#{password}.#{client_id}"] unless binding
         
         unless binding
-          debug("Establishing new connection for ['#{url}', '#{username}, '#{client_id}'")
+          debug("Establishing new connection for ['#{url}', '#{username}', '#{client_id}']")
           
           seconds = Benchmark.realtime {
             binding = RForce::Binding.new(url, sid)
