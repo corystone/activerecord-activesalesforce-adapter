@@ -148,12 +148,6 @@ module ActiveRecord
       end
 
 
-      def set_class_for_entity(klass, entity_name)
-        debug("Setting @class_to_entity_map['#{entity_name.upcase}'] = #{klass} for connection #{self}")
-        @class_to_entity_map[entity_name.upcase] = klass
-      end
-
-
       def binding
         @connection
       end
@@ -228,6 +222,42 @@ module ActiveRecord
       end
 
 
+      # Commits the transaction (and turns on auto-committing).
+      def commit_db_transaction()   
+        log("Committing boxcar with #{@command_boxcar.length} commands", 'commit_db_transaction()')
+        
+        previous_command = nil
+        commands = []
+        
+        @command_boxcar.each do |command|
+          if commands.length >= MAX_BOXCAR_SIZE or (previous_command and (command.verb != previous_command.verb))
+            send_commands(commands)
+            
+            commands = []
+            previous_command = nil
+          else
+            commands << command
+          previous_command = command
+          end
+        end
+        
+        # Discard the command boxcar
+        @command_boxcar = nil
+        
+        # Finish off the partial boxcar
+        send_commands(commands) unless commands.empty?
+        
+      end
+
+
+      # Rolls back the transaction (and turns on auto-committing). Must be
+      # done if the transaction block raises an exception or returns false.
+      def rollback_db_transaction() 
+        log('Rolling back boxcar', 'rollback_db_transaction()')
+        @command_boxcar = nil
+      end
+
+
       def send_commands(commands)
         # Send the boxcar'ed command set
         verb = commands[0].verb
@@ -262,42 +292,6 @@ module ActiveRecord
         end
         
         result
-      end
-
-
-      # Commits the transaction (and turns on auto-committing).
-      def commit_db_transaction()   
-        log("Committing boxcar with #{@command_boxcar.length} commands", 'commit_db_transaction()')
-        
-        previous_command = nil
-        commands = []
-        
-        @command_boxcar.each do |command|
-          if commands.length >= MAX_BOXCAR_SIZE or (previous_command and (command.verb != previous_command.verb))
-            send_commands(commands)
-            
-            commands = []
-            previous_command = nil
-          else
-            commands << command
-          previous_command = command
-          end
-        end
-        
-        # Discard the command boxcar
-        @command_boxcar = nil
-        
-        # Finish off the partial boxcar
-        send_commands(commands) unless commands.empty?
-        
-      end
-
-
-      # Rolls back the transaction (and turns on auto-committing). Must be
-      # done if the transaction block raises an exception or returns false.
-      def rollback_db_transaction() 
-        log('Rolling back boxcar', 'rollback_db_transaction()')
-        @command_boxcar = nil
       end
 
 
@@ -491,76 +485,6 @@ module ActiveRecord
       end
 
 
-      def get_updated(object_type, start_date, end_date, name = nil)
-        msg = "get_updated(#{object_type}, #{start_date}, #{end_date})"
-        log(msg, name) {
-          get_updated_element = []
-          get_updated_element << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << object_type
-          get_updated_element << :startDate << start_date
-          get_updated_element << :endDate << end_date
-          
-          result = get_result(@connection.getUpdated(get_updated_element), :getUpdated)
-          
-          result[:ids]
-        }
-      end
-
-
-      def get_deleted(object_type, start_date, end_date, name = nil)
-        msg = "get_deleted(#{object_type}, #{start_date}, #{end_date})"
-        log(msg, name) {
-          get_deleted_element = []
-          get_deleted_element << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << object_type
-          get_deleted_element << :startDate << start_date
-          get_deleted_element << :endDate << end_date
-          
-          result = get_result(@connection.getDeleted(get_deleted_element), :getDeleted)
-          
-          ids = []
-          result[:deletedRecords].each do |v| 
-            ids << v[:id]
-          end
-          
-          ids
-        }
-      end
-
-
-      def get_user_info(name = nil)
-        msg = "get_user_info()"
-        log(msg, name) {
-          get_result(@connection.getUserInfo([]), :getUserInfo)
-        }
-      end
-
-
-      def retrieve_field_values(object_type, fields, ids, name = nil) 
-        msg = "retrieve(#{object_type}, [#{ids.to_a.join(', ')}])"
-        log(msg, name) {
-          retrieve_element = []
-          retrieve_element << :fieldList << fields.to_a.join(", ")
-          retrieve_element << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << object_type
-          ids.to_a.each { |id| retrieve_element << :ids << id }
-          
-          result = get_result(@connection.retrieve(retrieve_element), :retrieve)
-          
-          result = [ result ] unless result.is_a?(Array)
-          
-          # Remove unwanted :type and normalize :Id if required
-          field_values = []
-          result.each do |v| 
-            v = v.dup
-            v.delete(:type)
-            v[:Id] = v[:Id][0] if v[:Id].is_a? Array
-            
-            field_values << v
-          end
-          
-          field_values
-        }
-      end
-
-
       def get_fields(columns, names, values, access_check) 
         fields = {}
         names.each_with_index do | name, n | 
@@ -606,7 +530,8 @@ module ActiveRecord
         
         fields
       end
-      
+
+
       def extract_sql_modifier(soql, modifier)
           value = soql.match(/\s+#{modifier}\s+(\d+)/mi)
           if value            
@@ -628,74 +553,23 @@ module ActiveRecord
       end
 
 
-      def check_result(result)
-        result = [ result ] unless result.is_a?(Array)
+      def create_sobject(entity_name, id, fields, null_fields = [])
+        sobj = []
         
-        result.each do |r|
-          raise ActiveSalesforce::ASFError.new(@logger, r[:errors], r[:errors][:message]) unless r[:success] == "true"
+        sobj << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << entity_name
+        sobj << 'Id { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << id if id    
+        
+        # add any changed fields
+        fields.each do | name, value |
+          sobj << name.to_sym << value if value
         end
         
-        result
-      end
-
-
-      def get_entity_def(entity_name)
-        cached_entity_def = @entity_def_map[entity_name]
-        
-        if cached_entity_def
-          debug( "   Using cached entity_def for #{entity_name}")
-          # Check for the loss of asf AR setup 
-          entity_klass = class_from_entity_name(entity_name)
-          
-          configure_active_record(cached_entity_def) unless entity_klass.respond_to?(:asf_augmented?)
-          
-          return cached_entity_def 
+        # add null fields
+        null_fields.each do | name, value |
+          sobj << 'fieldsToNull { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << name
         end
         
-        cached_columns = []
-        cached_relationships = []
-        
-        begin
-          metadata = get_result(@connection.describeSObject(:sObjectType => entity_name), :describeSObject)
-          custom = false
-        rescue ActiveSalesforce::ASFError
-          # Fallback and see if we can find a custom object with this name
-          debug("   Unable to find medata for '#{entity_name}', falling back to custom object name #{entity_name + "__c"}")
-          
-          metadata = get_result(@connection.describeSObject(:sObjectType => entity_name + "__c"), :describeSObject)
-          custom = true
-        end
-        
-        metadata[:fields].each do |field| 
-          column = SalesforceColumn.new(field) 
-          cached_columns << column
-          
-          cached_relationships << SalesforceRelationship.new(field, column) if field[:type] =~ /reference/mi
-        end
-        
-        relationships = metadata[:childRelationships]
-        if relationships
-          relationships = [ relationships ] unless relationships.is_a? Array
-          
-          relationships.each do |relationship|  
-            if relationship[:cascadeDelete] == "true"
-              r = SalesforceRelationship.new(relationship)
-              cached_relationships << r
-            end
-          end
-        end
-        
-        key_prefix = metadata[:keyPrefix]
-        
-        entity_def = ActiveSalesforce::EntityDefinition.new(self, entity_name, entity_klass,
-                                                            cached_columns, cached_relationships, custom, key_prefix)
-        
-        @entity_def_map[entity_name] = entity_def
-        @keyprefix_to_entity_def_map[key_prefix] = entity_def
-        
-        configure_active_record(entity_def)
-        
-        entity_def
+        [ :sObjects, sobj ]
       end
 
 
@@ -768,9 +642,11 @@ module ActiveRecord
       end
 
 
-      def columns(table_name, name = nil)
-        table_name, columns, entity_def = lookup(table_name)
-        entity_def.columns
+      # ENTITY MAPPING METHODS ===============================================
+      
+      def set_class_for_entity(klass, entity_name)
+        debug("Setting @class_to_entity_map['#{entity_name.upcase}'] = #{klass} for connection #{self}")
+        @class_to_entity_map[entity_name.upcase] = klass
       end
 
 
@@ -788,28 +664,63 @@ module ActiveRecord
       end
 
 
-      def create_sobject(entity_name, id, fields, null_fields = [])
-        sobj = []
+      def get_entity_def(entity_name)
+        cached_entity_def = @entity_def_map[entity_name]
         
-        sobj << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << entity_name
-        sobj << 'Id { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << id if id    
-        
-        # add any changed fields
-        fields.each do | name, value |
-          sobj << name.to_sym << value if value
+        if cached_entity_def
+          debug( "   Using cached entity_def for #{entity_name}")
+          # Check for the loss of asf AR setup 
+          entity_klass = class_from_entity_name(entity_name)
+          
+          configure_active_record(cached_entity_def) unless entity_klass.respond_to?(:asf_augmented?)
+          
+          return cached_entity_def 
         end
         
-        # add null fields
-        null_fields.each do | name, value |
-          sobj << 'fieldsToNull { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << name
+        cached_columns = []
+        cached_relationships = []
+        
+        begin
+          metadata = get_result(@connection.describeSObject(:sObjectType => entity_name), :describeSObject)
+          custom = false
+        rescue ActiveSalesforce::ASFError
+          # Fallback and see if we can find a custom object with this name
+          debug("   Unable to find medata for '#{entity_name}', falling back to custom object name #{entity_name + "__c"}")
+          
+          metadata = get_result(@connection.describeSObject(:sObjectType => entity_name + "__c"), :describeSObject)
+          custom = true
         end
         
-        [ :sObjects, sobj ]
-      end
-
-
-      def column_names(table_name)
-        columns(table_name).map { |column| column.name }
+        metadata[:fields].each do |field| 
+          column = SalesforceColumn.new(field) 
+          cached_columns << column
+          
+          cached_relationships << SalesforceRelationship.new(field, column) if field[:type] =~ /reference/mi
+        end
+        
+        relationships = metadata[:childRelationships]
+        if relationships
+          relationships = [ relationships ] unless relationships.is_a? Array
+          
+          relationships.each do |relationship|  
+            if relationship[:cascadeDelete] == "true"
+              r = SalesforceRelationship.new(relationship)
+              cached_relationships << r
+            end
+          end
+        end
+        
+        key_prefix = metadata[:keyPrefix]
+        
+        entity_def = ActiveSalesforce::EntityDefinition.new(self, entity_name, entity_klass,
+                                                            cached_columns, cached_relationships, custom, key_prefix)
+        
+        @entity_def_map[entity_name] = entity_def
+        @keyprefix_to_entity_def_map[key_prefix] = entity_def
+        
+        configure_active_record(entity_def)
+        
+        entity_def
       end
 
 
@@ -825,18 +736,115 @@ module ActiveRecord
       end
 
 
+      # SCHEMA STATEMENTS ====================================================
+
+      def column_names(table_name)
+        columns(table_name).map { |column| column.name }
+      end
+
+
+      def columns(table_name, name = nil)
+        table_name, columns, entity_def = lookup(table_name)
+        entity_def.columns
+      end
+
+
+      # OTHER METHODS (NOT AR) ===============================================
+      
+      def get_updated(object_type, start_date, end_date, name = nil)
+        msg = "get_updated(#{object_type}, #{start_date}, #{end_date})"
+        log(msg, name) {
+          get_updated_element = []
+          get_updated_element << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << object_type
+          get_updated_element << :startDate << start_date
+          get_updated_element << :endDate << end_date
+          
+          result = get_result(@connection.getUpdated(get_updated_element), :getUpdated)
+          
+          result[:ids]
+        }
+      end
+
+
+      def get_deleted(object_type, start_date, end_date, name = nil)
+        msg = "get_deleted(#{object_type}, #{start_date}, #{end_date})"
+        log(msg, name) {
+          get_deleted_element = []
+          get_deleted_element << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << object_type
+          get_deleted_element << :startDate << start_date
+          get_deleted_element << :endDate << end_date
+          
+          result = get_result(@connection.getDeleted(get_deleted_element), :getDeleted)
+          
+          ids = []
+          result[:deletedRecords].each do |v| 
+            ids << v[:id]
+          end
+          
+          ids
+        }
+      end
+
+
+      def get_user_info(name = nil)
+        msg = "get_user_info()"
+        log(msg, name) {
+          get_result(@connection.getUserInfo([]), :getUserInfo)
+        }
+      end
+
+
+      def retrieve_field_values(object_type, fields, ids, name = nil) 
+        msg = "retrieve(#{object_type}, [#{ids.to_a.join(', ')}])"
+        log(msg, name) {
+          retrieve_element = []
+          retrieve_element << :fieldList << fields.to_a.join(", ")
+          retrieve_element << 'type { :xmlns => "urn:sobject.partner.soap.sforce.com" }' << object_type
+          ids.to_a.each { |id| retrieve_element << :ids << id }
+          
+          result = get_result(@connection.retrieve(retrieve_element), :retrieve)
+          
+          result = [ result ] unless result.is_a?(Array)
+          
+          # Remove unwanted :type and normalize :Id if required
+          field_values = []
+          result.each do |v| 
+            v = v.dup
+            v.delete(:type)
+            v[:Id] = v[:Id][0] if v[:Id].is_a? Array
+            
+            field_values << v
+          end
+          
+          field_values
+        }
+      end
+
+
+      def check_result(result)
+        result = [ result ] unless result.is_a?(Array)
+        
+        result.each do |r|
+          raise ActiveSalesforce::ASFError.new(@logger, r[:errors], r[:errors][:message]) unless r[:success] == "true"
+        end
+        
+        result
+      end
+
+
+      protected
+
       def debug(msg)
         @logger.debug(msg) if @logger
       end
 
-      protected
 
       def queue_command(command)
         # If @command_boxcar is not nil, then this is a transaction
         # and commands should be queued in the boxcar
         if @command_boxcar
           @command_boxcar << command
-
+        
         # If a command is not executed within a transaction, it should
         # be executed immediately
         else
