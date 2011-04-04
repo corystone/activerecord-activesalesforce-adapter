@@ -658,6 +658,8 @@ module ActiveRecord
         unless entity_klass
           sf = self.class.const_get('Salesforce')
           entity_klass = sf && sf.const_get(entity_name)
+          # set it if we don't have it
+          set_class_for_entity(entity_klass, entity_name)
         end
         
         entity_klass
@@ -712,9 +714,10 @@ module ActiveRecord
         
         key_prefix = metadata[:keyPrefix]
         
-        entity_def = ActiveSalesforce::EntityDefinition.new(self, entity_name, entity_klass,
+        entity_def = ActiveSalesforce::EntityDefinition.new(@connection, entity_name, entity_klass,
                                                             cached_columns, cached_relationships, custom, key_prefix)
         
+        debug("Storing entity map for '#{entity_name}','#{entity_klass}'")
         @entity_def_map[entity_name] = entity_def
         @keyprefix_to_entity_def_map[key_prefix] = entity_def
         
