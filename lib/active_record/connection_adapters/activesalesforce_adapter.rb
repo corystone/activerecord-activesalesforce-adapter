@@ -651,11 +651,10 @@ module ActiveRecord
 
 
       def class_from_entity_name(entity_name)
-        entity_klass = @class_to_entity_map[entity_name.upcase]
-        debug("Found matching class '#{entity_klass}' for entity '#{entity_name}'") if entity_klass
-        
-        # Constantize entities under the Salesforce namespace.
-        unless entity_klass
+        if entity_klass = @class_to_entity_map[entity_name.upcase]
+          debug("Found matching class '#{entity_klass}' for entity '#{entity_name}'")
+        else
+          # Constantize entities under the Salesforce namespace.
           sf = self.class.const_get('Salesforce')
           entity_klass = sf && sf.const_get(entity_name)
           # set it if we don't have it
