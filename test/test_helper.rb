@@ -23,7 +23,8 @@ module TestHelper
     action = { :adapter => 'activesalesforce',
                :url => config[:url],
                :username => config[:username],
-               :password => config[:password] }
+               :password => config[:password],
+               :api_version => config[:api_version] }
     
     ActiveRecord::Base.logger = LOGGER
     ActiveRecord::Base.clear_active_connections!

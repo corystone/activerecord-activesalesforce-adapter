@@ -72,13 +72,7 @@ module ActiveRecord
       debug("\nUsing ActiveSalesforce connection\n")
       
       # Default to production system using 20.0 API
-      url = config[:url]
-      url = "https://www.salesforce.com" unless url
-
-      uri = URI.parse(url)
-      uri.path = "/services/Soap/u/20.0"
-      url = uri.to_s      
-      
+      url = URI.join( (config[:url] || "https://www.salesforce.com"), "/services/Soap/u/", (config[:api_version] || "20.0").to_s ).to_s
       sid = config[:sid]
       client_id = config[:client_id]
       username = config[:username].to_s

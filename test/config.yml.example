@@ -2,3 +2,4 @@ adapter: activesalesforce
 url: https://test.salesforce.com
 username: dutch@activesalesforce.com
 password:
+api_version: 20.0
