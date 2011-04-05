@@ -1,16 +1,40 @@
 Dir['tasks/**/*.rake'].each { |t| load t }
 
-require "rubygems"
+require 'rubygems'
 require "rake/gempackagetask"
 require "rake/rdoctask"
-
 require "rake/testtask"
+
+unless ENV['NOBUNDLE']
+  begin
+    require 'bundler'
+    Bundler.setup
+  rescue LoadError
+    puts 'You must `gem install bundler` and `bundle install` to run rake tasks'
+  end
+end
+
+## Test tasks
 Rake::TestTask.new do |t|
   t.libs << "test"
   t.test_files = FileList["test/**/*_test.rb"]
   t.verbose = true
 end
 
+desc 'Run all tests (same as `rake test`)'
+task 'test:all' => :test
+
+Rake::TestTask.new('test:unit') do |t|
+  t.libs << "test"
+  t.test_files = FileList["test/unit/*_test.rb"]
+  t.verbose = true
+end
+
+Rake::TestTask.new('test:functional') do |t|
+  t.libs << "test"
+  t.test_files = FileList["test/functional/*_test.rb"]
+  t.verbose = true
+end
 
 task :default => ["test"]
 
