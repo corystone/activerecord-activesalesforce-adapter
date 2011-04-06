@@ -613,9 +613,10 @@ module ActiveRecord
           rescue NameError => e
             # Automatically create at least a stub for the referenced entity
             debug("   Creating ActiveRecord stub for the referenced entity '#{reference_to}'")
-            self.class.const_set('Salesforce', Module.new) unless self.class.const_defined? 'Salesforce'
+            # self.class.const_set('Salesforce', Module.new) unless self.class.const_defined? 'Salesforce'
             # Use entity map to prevent duplicate definitions
-            set_class_for_entity(Salesforce.const_set(reference_to, Class.new(ActiveRecord::Base)), reference_to)
+            # set_class_for_entity(Salesforce.const_set(reference_to, Class.new(ActiveRecord::Base)), reference_to)
+            set_class_for_entity(klass.class_eval("Salesforce::#{reference_to} = Class.new(ActiveRecord::Base)"), reference_to)
           end
           
           referenced_klass.instance_variable_set("@asf_connection", klass.connection)
@@ -645,16 +646,19 @@ module ActiveRecord
 
 
       def class_from_entity_name(entity_name)
-        if entity_klass = @class_to_entity_map[entity_name.upcase]
+        entity_name = entity_name.camelize
+        entity_klass = @class_to_entity_map[entity_name.upcase]
+        if entity_klass
           debug("Found matching class '#{entity_klass}' for entity '#{entity_name}'")
         else
           # Constantize entities under the Salesforce namespace.
-          sf = self.class.const_get('Salesforce')
-          entity_klass = sf && sf.const_get(entity_name)
+          # sf = self.class.const_get('Salesforce')
+          # entity_klass = sf && sf.const_get(entity_name)
+          
           # set it if we don't have it
-          set_class_for_entity(entity_klass, entity_name)
+          # set_class_for_entity(entity_klass, entity_name)
+          entity_klass = set_class_for_entity(("Salesforce::" + entity_name).constantize, entity_name)
         end
-        
         entity_klass
       end
 
@@ -724,7 +728,8 @@ module ActiveRecord
         table_name = raw_table_name.downcase.singularize
         
         # See if a table name to AR class mapping was registered
-        klass = @class_to_entity_map[table_name.upcase]
+        # klass = @class_to_entity_map[table_name.upcase]
+        klass = class_from_entity_name(table_name)
         entity_name = klass ? table_name : table_name.camelize
         entity_def = get_entity_def(entity_name)
         
