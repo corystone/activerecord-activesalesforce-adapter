@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    activerecord-activesalesforce-adapter (2.3.7.1)
+    activerecord-activesalesforce-adapter (2.3.7.2)
       rails (~> 2.3.8)
       rforce (~> 0.4)
 

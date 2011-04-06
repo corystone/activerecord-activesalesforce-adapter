@@ -47,18 +47,18 @@ spec = Gem::Specification.new do |s|
 
   # Change these as appropriate
   s.name              = "activerecord-activesalesforce-adapter"
-  s.version           = "2.3.7.1"
+  s.version           = "2.3.7.2"
   s.summary           = %q{ActiveSalesforce (ASF) is a Rails connection adapter that provides direct access to Salesforce.com hosted data and metadata via the ActiveRecord model layer. Objects, fields, and relationships are all auto surfaced as active record attributes and rels.  }
   s.authors           = ["Doug Chasman", "Luigi Montanez", "Senthil Nayagam", "Justin Ball", "Jesse Hallett", "Andrew Freeberg", "Don Morrison"]
   s.email             = "elskwid@gmail.com"
   s.homepage          = "http://github.com/amphora/activerecord-activesalesforce-adapter"
 
   s.has_rdoc          = false
-  s.extra_rdoc_files  = %w(README)
-  s.rdoc_options      = %w(--main README.md)
+  s.extra_rdoc_files  = %w(README.markdown)
+  s.rdoc_options      = %w(--main README.markdown)
 
   # Add any extra files to include in the gem
-  s.files             = %w(LICENSE Rakefile README.md) + Dir.glob("{test,lib}/**/*")
+  s.files             = %w(Rakefile README.markdown) + Dir.glob("{test,lib}/**/*")
   s.require_paths     = ["lib"]
 
   # If you want to depend on other gems, add them here, along with any
