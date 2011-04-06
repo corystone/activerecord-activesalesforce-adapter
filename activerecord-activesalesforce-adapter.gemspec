@@ -6,7 +6,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Doug Chasman", "Luigi Montanez", "Senthil Nayagam", "Justin Ball", "Jesse Hallett", "Andrew Freeberg", "Don Morrison"]
-  s.date = %q{2011-04-05}
+  s.date = %q{2011-04-06}
   s.email = %q{elskwid@gmail.com}
   s.extra_rdoc_files = ["README"]
   s.files = ["LICENSE", "Rakefile", "README.md", "test/config.yml", "test/config.yml.example", "test/functional", "test/functional/basic_test.rb", "test/test_helper.rb", "test/unit", "test/unit/some_unit_test.rb", "lib/active_record", "lib/active_record/connection_adapters", "lib/active_record/connection_adapters/activesalesforce.rb", "lib/active_record/connection_adapters/activesalesforce_adapter.rb", "lib/active_record/connection_adapters/asf_active_record.rb", "lib/active_record/connection_adapters/boxcar_command.rb", "lib/active_record/connection_adapters/column_definition.rb", "lib/active_record/connection_adapters/entity_definition.rb", "lib/active_record/connection_adapters/id_resolver.rb", "lib/active_record/connection_adapters/relationship_definition.rb", "lib/active_record/connection_adapters/result_array.rb", "lib/active_record/connection_adapters/sid_authentication_filter.rb", "lib/activerecord-activesalesforce-adapter.rb", "README"]
