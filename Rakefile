@@ -61,6 +61,9 @@ spec = Gem::Specification.new do |s|
   s.files             = %w(Rakefile README.markdown) + Dir.glob("{test,lib}/**/*")
   s.require_paths     = ["lib"]
 
+  # Exclude these files
+  ['test/config.yml'].each{ |exc| s.files.delete(exc) }
+
   # If you want to depend on other gems, add them here, along with any
   # relevant versions
   s.add_dependency("rails",   "~> 2.3.8")
