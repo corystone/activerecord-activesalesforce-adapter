@@ -61,12 +61,6 @@ module ActiveRecord
     end
 
 
-    # AcitveRecord expects this to be here (we don't use scopes with AS anyway)
-    def self.default_scoping
-      []
-    end
-
-
     # Establishes a connection to the database that's used by all Active Record objects.
     def self.activesalesforce_connection(config) # :nodoc:
       debug("\nUsing ActiveSalesforce connection\n")
